@@ -1,93 +1,27 @@
-$ErrorActionPreference = "Stop"
-
-$RepoSlug = "NoobyGains/claude-pulse"
-$RepoUrl = "https://github.com/$RepoSlug.git"
-$RawBaseUrl = "https://raw.githubusercontent.com/$RepoSlug/main"
-
-$InstallDir = if ($env:CLAUDE_PULSE_DIR) { $env:CLAUDE_PULSE_DIR } else { Join-Path $HOME ".claude-pulse" }
-$ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-Path $HOME ".claude" }
-$CommandsDir = Join-Path $ClaudeDir "commands"
-
-$InstallMethod = ""
-
-function Write-Step {
-  param([string]$Message)
-  Write-Host $Message
-}
-
-function Throw-IfFailed {
-  param([string]$Message)
-  if ($LASTEXITCODE -ne 0) {
-    throw $Message
-  }
-}
-
-function Download-Files {
-  New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-  Invoke-WebRequest -Uri "$RawBaseUrl/claude_status.py" -OutFile (Join-Path $InstallDir "claude_status.py")
-  Invoke-WebRequest -Uri "$RawBaseUrl/pulse.md" -OutFile (Join-Path $InstallDir "pulse.md")
-  $script:InstallMethod = "raw"
-}
-
-if (Get-Command git -ErrorAction SilentlyContinue) {
-  if (Test-Path (Join-Path $InstallDir ".git")) {
-    $originUrl = (git -C $InstallDir remote get-url origin).Trim()
-    Throw-IfFailed "Failed to read git origin from $InstallDir"
-    if ($originUrl -notmatch "NoobyGains/claude-pulse(\.git)?$") {
-      throw "Existing git repo at '$InstallDir' has unexpected origin '$originUrl'"
+param([string]$InstallDir = "$HOME/.codexpulse/project", [switch]$NoSkill)
+$ErrorActionPreference = 'Stop'
+foreach ($name in @('python', 'git', 'codex')) {
+    if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
+        throw "Missing $name. Install Python 3.11+, Git, and Codex CLI, then run codex login."
     }
-
-    Write-Step "Updating existing claude-pulse clone..."
-    git -C $InstallDir pull --ff-only origin main | Out-Null
-    Throw-IfFailed "Failed to update git clone"
-    $InstallMethod = "git"
-  }
-  elseif (Test-Path (Join-Path $InstallDir "claude_status.py")) {
-    Write-Step "Existing non-git install detected, refreshing files..."
-    Download-Files
-  }
-  elseif (Test-Path $InstallDir) {
-    throw "Directory already exists and is not a claude-pulse install: $InstallDir"
-  }
-  else {
-    $parentDir = Split-Path -Parent $InstallDir
-    if ($parentDir -and -not (Test-Path $parentDir)) {
-      New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+}
+python -c 'import sys; sys.exit(0 if sys.version_info >= (3,11) else 1)'
+if ($LASTEXITCODE -ne 0) { throw 'Python 3.11+ is required. Check Windows app execution aliases if python opens the Store.' }
+if ($PSScriptRoot -and (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'codex_status.py'))) {
+    $projectRoot = $PSScriptRoot
+} else {
+    $projectRoot = [IO.Path]::GetFullPath($InstallDir)
+    if (Test-Path -LiteralPath $projectRoot) {
+        throw "Destination already exists: $projectRoot. Run its codex_status.py --install or choose another InstallDir."
     }
-
-    Write-Step "Cloning claude-pulse..."
-    git clone --depth 1 $RepoUrl $InstallDir | Out-Null
-    Throw-IfFailed "Failed to clone repository"
-    $InstallMethod = "git"
-  }
+    git clone --depth 1 https://github.com/NoobyGains/CodexPulse.git $projectRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Clone failed; no Codex configuration was changed.' }
 }
-else {
-  Write-Step "git not found, downloading scripts directly..."
-  Download-Files
+python (Join-Path $projectRoot 'codex_status.py') --install
+if ($LASTEXITCODE -ne 0) { throw 'Footer setup failed. See the diagnostic above.' }
+if (-not $NoSkill) {
+    python (Join-Path $projectRoot 'codex_status.py') --install-skill
+    if ($LASTEXITCODE -ne 0) { throw 'Skill setup failed. The native footer is installed.' }
 }
-
-$PulseCommandPath = Join-Path $InstallDir "pulse.md"
-if (Test-Path $PulseCommandPath) {
-  New-Item -ItemType Directory -Path $CommandsDir -Force | Out-Null
-  Copy-Item -Path $PulseCommandPath -Destination (Join-Path $CommandsDir "pulse.md") -Force
-}
-
-$StatusScriptPath = Join-Path $InstallDir "claude_status.py"
-if (Get-Command python -ErrorAction SilentlyContinue) {
-  & python $StatusScriptPath --install
-  Throw-IfFailed "Python installer command failed"
-}
-elseif (Get-Command py -ErrorAction SilentlyContinue) {
-  & py -3 $StatusScriptPath --install
-  Throw-IfFailed "Python launcher installer command failed"
-}
-else {
-  throw "Python 3 is required. Install Python, then run this installer again."
-}
-
-Write-Host ""
-Write-Host "claude-pulse installed in: $InstallDir"
-Write-Host "Restart Claude Code, then run /pulse to configure your status bar."
-if ($InstallMethod -eq "raw") {
-  Write-Host "Note: installed without git. /pulse update expects a git clone."
-}
+Write-Host "CodexPulse installed. Restart Codex for the footer."
+Write-Host "Full display: python `"$projectRoot/codex_status.py`" --launch --cwd `"$PWD`""

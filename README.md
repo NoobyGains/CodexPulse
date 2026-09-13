@@ -1,340 +1,296 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="claude-pulse logo" width="600" />
+  <img src="assets/logo.svg" alt="CodexPulse logo" width="660" />
+</p>
+
+<h1 align="center">Stop guessing how much Codex you have left.</h1>
+
+<p align="center">
+  CodexPulse brings the familiar Pulse experience to Codex CLI — usage limits, reset timers, context pressure, and the details that keep you moving.
 </p>
 
 <p align="center">
-  Real-time usage monitor for Claude Code — session limits, weekly limits, per-model caps (Opus/Sonnet/Fable), cost tracking, and 10 themes with animations. All in your status bar.
+  <strong>Your existing Codex login. Zero runtime dependencies. Built for Windows, macOS, and Linux.</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/NoobyGains/claude-pulse/stargazers"><img src="https://img.shields.io/github/stars/NoobyGains/claude-pulse?style=social" alt="GitHub Stars" /></a>
-  <img src="https://img.shields.io/github/v/tag/NoobyGains/claude-pulse?label=version&color=blue" alt="Version" />
-  <img src="https://img.shields.io/badge/python-3.8+-3776AB?logo=python&logoColor=white" alt="Python 3.8+" />
-  <img src="https://img.shields.io/badge/dependencies-zero-brightgreen" alt="Zero Dependencies" />
-  <img src="https://img.shields.io/badge/Claude%20Code-v2.1.80+-7C3AED?logo=anthropic&logoColor=white" alt="Claude Code v2.1.80+" />
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform" />
-  <a href="https://github.com/NoobyGains/claude-pulse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/NoobyGains/claude-pulse?color=green" alt="License" /></a>
-  <a href="https://buymeacoffee.com/noobygains"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-donate-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy Me A Coffee" /></a>
-</p>
-
----
-
-## What is this?
-
-A single-file Python status bar for Claude Code that shows everything you need at a glance — no API key required, zero dependencies, works with your existing Claude Code subscription.
-
-<p align="center">
-  <img src="assets/demo.gif" alt="claude-pulse themes demo" width="700" />
-  <br>
-  <sub>10 built-in themes with colour-coded bars that shift green → yellow → red as usage increases</sub>
+  <a href="https://github.com/NoobyGains/CodexPulse/stargazers"><img src="https://img.shields.io/github/stars/NoobyGains/CodexPulse?style=social" alt="GitHub Stars" /></a>
+  <a href="https://github.com/NoobyGains/CodexPulse/releases"><img src="https://img.shields.io/github/v/release/NoobyGains/CodexPulse?color=4ade80" alt="Version" /></a>
+  <a href="https://github.com/NoobyGains/CodexPulse/actions"><img src="https://github.com/NoobyGains/CodexPulse/actions/workflows/tests.yml/badge.svg" alt="Tests" /></a>
+  <img src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white" alt="Python 3.11+" />
+  <img src="https://img.shields.io/badge/runtime_dependencies-zero-brightgreen" alt="Zero runtime dependencies" />
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platforms" />
 </p>
 
 <p align="center">
-  <img src="assets/rainbow.gif" alt="Rainbow animation demo" width="700" />
-  <br>
-  <sub>Rainbow animation — flowing gradient that shifts on every refresh</sub>
+  <img src="assets/demo.gif" alt="Illustration of session usage growing from green to amber to red, beside weekly, model quota, and context indicators" width="900" />
+  <br />
+  <sub>Illustrative data. The full companion display uses your account's actual windows and model buckets.</sub>
 </p>
 
-<p align="center">
-  <img src="assets/update.gif" alt="Update notification demo" width="700" />
-  <br>
-  <sub>Automatic update notifications for both claude-pulse and Claude Code</sub>
-</p>
+The familiar compact view:
 
-```
-Session ━━━───────── 27% 2h 53m | Weekly ━━━━━━━━━─── 73% R:Fri 3pm | Fable ━━───────── 18% | Context ━━━━──────── 35% | $38.75 | +142 -37 | Opus 5 | Effort: XHigh | ⚡fast | main
+```text
+Session 39% 3h 31m | Weekly 78% R:Wed 10pm | Model quota 89% | Context 14%
 ```
 
-## What's new in 3.3.0
+Or progress bars, model, reasoning, and Git context:
 
-- **Sonnet 5 priced at its now-permanent $2/$10 rate** — Anthropic cancelled the scheduled September increase to $3/$15. Historical turns are priced by their own date either way, so a promo lapsing can never retroactively inflate the cost widgets.
-- **GitLab merge requests render as `!N`** via the `pr.kind` stdin field (Claude Code 2.1.234+); GitHub PRs keep `#N`.
-- **MiniMax quota works on Windows** — npm installs `mmx` as a `.cmd` shim that `subprocess` won't auto-resolve; the call now goes through a PATH lookup (thanks @PFalko, #50).
-- **The repaint timer heals itself** — a focus timer expiring on its own or a heartbeat going stale no longer leaves the 15s timer armed, and a heartbeat waking from idle arms it immediately.
-- **Self-hosted star chart** — GitHub restricted the stargazers API to repo collaborators, so the README chart is rendered weekly by a workflow with the repo's own token and committed as static SVGs.
-- **Fable weekly cap** — read from the model-scoped `limits` the API reports, so new models are picked up without a code change.
-- **Claude 5-era stdin fields** — reasoning effort, `⚡fast` mode, thinking state, active subagent, PR badge, and cache-hit ratio.
-- **Fixed: the refresh timer never worked.** Every version up to 3.1.0 wrote a `refresh` key that Claude Code does not have, so it was silently ignored — animations, the heartbeat and the focus countdown froze whenever the session went idle. The real setting is `refreshInterval`, and it is now set only when something time-based is on screen.
-- **~40% faster repaints** (204ms → 118ms): `claude --version` and `git rev-parse` were both running on *every* repaint just to validate hourly caches.
-- **Per-model bars no longer invent data** — Claude Pro reports `null` for the model-scoped windows, and 3.1.0 drew a hardcoded `Sonnet 0%` bar in that case.
-- **Zero API calls, for real** — the per-model caps arrive on stdin, but 3.1.0 discarded them and re-fetched over OAuth. That call is gone.
-- **Two-line layout**, rolling **7-day cost** widget, `CLAUDE_CONFIG_DIR` support, exponential backoff on 429, and an update check that no longer nags forks forever.
-- **Corrupt state can't blank the bar** — a truncated or hand-edited cache/settings file used to raise on the hot path. Every state read now degrades to a cache miss instead, and one malformed rate-limit field no longer discards the windows after it.
-- **Subagent panel rows** via `subagentStatusLine`, a live agent counter from the `SubagentStart`/`SubagentStop` hooks, and an opt-in budget bar.
-- **The heartbeat is now opt-in** — the `[/] 42 tools 5m` spinner is noise for most people, needs a hook, and kept the repaint timer alive. `--show heartbeat` brings it back.
-- **Peak hours removed.**
-
-Python floor is **3.8** — 3.1.0 advertised 3.6+ but did not parse below 3.12. Test suite: 21 → 204.
-
-## Features
-
-| Feature | Description |
-|---|---|
-| **Session & Weekly bars** | Colour-coded progress bars (green → yellow → red) for 5-hour session and 7-day weekly limits |
-| **Context window** | Live context usage percentage with pressure warnings at 70%/90% |
-| **Cost tracking** | Real-time session cost in your local currency (USD, GBP, EUR, + 25 more) with live exchange rates |
-| **Per-model weekly caps** | Separate bars for Opus, Sonnet and **Fable** weekly budgets, read from the model-scoped limits the API reports. Shown only when your plan actually reports them |
-| **Effort & fast mode** | Reasoning effort, written as `Effort: Medium` by default and colour-escalating with the level (`--effort-format full`/`short` for `Medium`/`med`), plus a **⚡fast** badge while Opus fast mode is on |
-| **Subagent & PR** | Active subagent name, plus an opt-in clickable PR badge with review state (OSC 8 hyperlink) |
-| **Cache efficiency** | Opt-in indicator for the share of input served from cache — the clearest cost signal on stdin |
-| **Two-line layout** | Split widgets across two rows with `line1_widgets` / `line2_widgets` |
-| **Subagent rows** | Custom per-agent rows in the agent panel via `subagentStatusLine` — status, model, effort, a context bar from `tokenCount`/`contextWindowSize`, and elapsed time |
-| **Live agent counter** | `agents 3 live · 47/200` from `SubagentStart`/`SubagentStop` hooks, colour-escalating toward the caps |
-| **Budget bar** | Spend against a ceiling you set with `--budget` to match your `--max-budget-usd` |
-| **Live heartbeat** | Opt-in spinner with tool count and elapsed time — `--show heartbeat` plus `--install-hooks` |
-| **Git branch** | Current branch name always visible |
-| **Model display** | Shows which model is active (Fable, Opus, Sonnet, Haiku) |
-| **10 themes** | default, ocean, sunset, mono, neon, pride, frost, ember, candy, rainbow |
-| **5 animation modes** | off, rainbow, pulse, glow, shift — each visually distinct |
-| **8 bar styles** | classic, block, shade, pipe, dot, square, star, braille |
-| **Lines changed** | Shows `+42 -7` in green/red — lines added and removed this session, read from stdin |
-| **Cumulative cost** | Opt-in widget showing total API-equivalent cost across all sessions (cached, 5-min refresh) |
-| **Widget priorities** | Every widget has a priority number — reorder them with `--priority model=5,cost=15` |
-| **Focus timer** | Built-in focus timer — `--focus start 25` shows countdown in the status bar |
-| **Auto-updates** | Notifies when a new version of claude-pulse or Claude Code is available |
-| **Staleness indicator** | Shows data age when cached data is old |
-| **Zero API calls** | Reads rate limits directly from Claude Code's stdin (v2.1.80+) — no OAuth, no rate limiting |
-
-## Quick Start
-
-### Plugin marketplace (recommended)
-
-```
-/plugin marketplace add NoobyGains/claude-pulse
-/plugin install claude-pulse
+```text
+Session ━━━━──────── 39% 3h 31m | Weekly ━━━━━━━━━─── 78% R:Wed 10pm
+Context ━━────────── 14% | codex-model | Effort high | main
 ```
 
-Then run `/pulse` to configure. Restart Claude Code.
+**Two displays, one project.** The **native footer** lives inside Codex CLI and uses its supported built-in status items. The **Pulse companion** runs in a terminal pane below Codex and supplies the full themes, bars, animations, timers, and extra widgets. Codex's documented `tui.status_line` accepts item identifiers, not a script command. Pulse does not patch the Codex executable or inject a footer into the desktop app. [Official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
 
-### One-liner install
+Native Codex labels quota **remaining**; the companion labels quota **used**, matching Claude Pulse. For example, `75% left` and `Weekly 25%` describe the same usage.
 
-**macOS / Linux:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/NoobyGains/claude-pulse/main/install.sh | bash
-```
+The companion also has an **adaptive display**: `--native-mode auto` reads the configured native footer and keeps complementary bars and reset timers while omitting duplicated percentages and metadata. `--native-mode off` restores the complete standalone display. Detection reads configuration, not another window's pixels; command-line overrides or a different session can differ. [Adaptive display details](ADAPTIVE-DISPLAY.md)
 
-**Windows (PowerShell):**
+## Install — about a minute
+
+Install [Codex CLI](https://learn.chatgpt.com/docs/codex-cli), Python 3.11+, and Git, then run `codex login` once.
+
+### Windows (PowerShell)
+
 ```powershell
-irm https://raw.githubusercontent.com/NoobyGains/claude-pulse/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/NoobyGains/CodexPulse/main/install.ps1 | iex
 ```
 
-### Manual install
+Restart Codex for the native footer. To open Codex with a live Pulse pane underneath, run this from your coding project:
 
-```bash
-git clone https://github.com/NoobyGains/claude-pulse.git ~/.claude-pulse
-python3 ~/.claude-pulse/claude_status.py --install
+```powershell
+python "$HOME/.codexpulse/project/codex_status.py" --launch
 ```
 
-Restart Claude Code. That's it.
+### macOS / Linux
 
-### Enable the live heartbeat (optional)
-
-The heartbeat shows a tool counter and elapsed time, updated on every tool call:
-
-```bash
-python3 ~/.claude-pulse/claude_status.py --install-hooks
+```sh
+curl -fsSL https://raw.githubusercontent.com/NoobyGains/CodexPulse/main/install.sh | sh
 ```
 
-Restart Claude Code for hooks to take effect.
+Restart Codex for the native footer. Open a small terminal split and run:
 
-## Configuration
-
-Use `/pulse` in Claude Code for an interactive setup wizard, or configure directly:
-
-```bash
-# Themes
---theme ocean              # ocean, sunset, mono, neon, pride, frost, ember, candy, rainbow
-
-# Animation
---animate rainbow          # rainbow, pulse, glow, shift, off
---animation-speed fast     # slow, normal, fast
-
-# Display
---bar-size large           # small, small-medium, medium, medium-large, large
---bar-style block          # classic, block, shade, pipe, dot, square, star, braille
---layout compact           # standard, compact, minimal, percent-first
---wrap auto                # off (default, truncate) or auto (wrap to 2 lines at | when narrow)
-
-# Two-line layout (config.json) — deliberate split, unlike --wrap's overflow handling.
-#   "line2_widgets": ["model", "effort", "branch"]   push these to row 2
-#   "line1_widgets": ["session", "weekly"]           allowlist row 1, rest flows to row 2
-# line1_widgets wins if both are set.
-
-# Currency (auto-converts USD via live exchange rate)
---currency £               # $, £, €, ¥, C$, A$, ₹, kr, and 20+ more
-
-# Budget (Claude Code's --max-budget-usd is CLI-only and can't be read from
-# here, so set the same number to track spend against it)
---budget 25                # or: --budget off
-
-# Caps shown as denominators. Claude Code enforces these but doesn't report
-# them, so set them to match your setup. 0 hides that denominator.
---limits                   # show current values
---limits subagent_spawns=200,subagent_concurrent=20,web_searches=200
-
-# Effort display (how the reasoning-effort level is written)
---effort-format labeled    # labeled (default) 'Effort: Medium' · full 'Medium' · short 'med'
-
-# Clock and timers
---clock-format 12h         # 12h or 24h
---weekly-timer-format auto # auto, countdown, date
---weekly-timer-prefix "R:" # text before the weekly reset time
-
-# Other display options
---context-format percent   # percent or tokens (155k/1M)
---max-width 80             # % of terminal width the bar may use
---extra-display auto       # auto, full, amount, minimal (bonus credits)
---streak-style fire        # how the daily streak is drawn
---show-all                 # preview every widget at once
-
-# Widget priority (lower = leftmost)
---priority                 # Show all widget priorities
---priority model=5,cost=15 # Move model first, cost after session
-
-# Toggle features
---show lines               # Show +N/-N lines changed
---show burn_rate           # Show usage velocity (↑3%/hr)
---show git_drift           # Show commits ahead/behind
---show cumulative_cost     # Show total API-equivalent cost across all sessions
---show weekly_cost         # Show rolling 7-day API-equivalent cost
---show cache               # Show % of input served from cache (cost signal)
---show pr                  # Show clickable PR badge + review state
---show thinking            # Show whether extended thinking is on
---show files_changed       # Show modified file count
---show last_tool           # Show last tool Claude used
---hide cost                # Hide cost ticker
---hide heartbeat           # Hide tool counter
---hide fable               # Hide the Fable weekly cap bar
---hide fast_mode           # Hide the ⚡fast badge
---hide agent               # Hide the active subagent name
---hide subagents           # Hide the live agent counter
---hide budget              # Hide the budget bar
-
-# Internal (invoked by Claude Code, not by you):
-#   --subagent-status-line   renders the agent-panel rows
-#   --hook-refresh           PostToolUse heartbeat
-#   --hook-subagent-start/-stop   live agent counter
-#   --debug-stdin            dump the raw stdin payload for troubleshooting
-
-# Focus timer
---focus start 25        # Start a 25-minute focus timer
---focus stop            # Stop the timer
---focus status          # Check remaining time
-
-# Info
---config                   # Show current configuration
---stats                    # Show session statistics
---heatmap                  # Show activity heatmap
---update                   # Update to latest version
+```sh
+python3 ~/.codexpulse/project/codex_status.py --watch --cwd /path/to/your/project --native-mode off
 ```
 
-## How It Works
+The installers check prerequisites, clone a separate project, back up Codex configuration, configure its footer, and install the `$codexpulse` conversation helper. They do not install system packages or change Claude's settings. An existing destination is left for you to update explicitly.
 
-```
-┌───────────────────────────────────────────────┐
-│  Claude Code                                  │
-│  Pipes JSON via stdin on every status refresh │
-│  (model, context, cost, rate_limits, effort,  │
-│   fast_mode, agent, pr, version)              │
-├───────────────────────────────────────────────┤
-│  claude_status.py                             │
-│  Reads stdin → builds ANSI status line        │
-│  No API calls needed (v2.1.80+)               │
-├───────────────────────────────────────────────┤
-│  PostToolUse Hook (optional)                  │
-│  Updates tool count, heartbeat, git branch    │
-│  on every tool call                           │
-├───────────────────────────────────────────────┤
-│  Cache Layer                                  │
-│  Exchange rates (24h) · update checks (1h)    │
-│  cumulative + weekly cost (5m) · hook (5m)    │
-│  429 backoff · animation state · history      │
-└───────────────────────────────────────────────┘
+<details>
+<summary>Manual install, existing checkout, or pip</summary>
+
+```sh
+git clone https://github.com/NoobyGains/CodexPulse.git
+cd CodexPulse
+python codex_status.py --install
+python codex_status.py --install-skill
+python codex_status.py --doctor --cwd /path/to/your/project
 ```
 
-**Data flow:** Claude Code sends session JSON via stdin → claude-pulse reads rate limits directly (no API) → renders colourised ANSI status line → Claude Code displays it.
+Use `python3` where your system names it that way. Running `./install.ps1` or `sh install.sh` from a checkout uses that checkout. Set `CODEX_HOME` for a non-default Codex profile directory and `CODEXPULSE_HOME` for non-default Pulse state. The remote PowerShell installer accepts `-InstallDir` when saved and run as a file; the shell installer accepts `CODEXPULSE_INSTALL_DIR`.
 
-**Rate limits from stdin (v2.1.80+):** Claude Code sends `rate_limits` on stdin — the 5-hour and 7-day windows plus the model-scoped weekly caps (`seven_day_opus`, `seven_day_sonnet`, `seven_day_fable`). claude-pulse reads all of them straight from stdin, so no OAuth call is needed for the bars. The API is only consulted for extra/bonus credits, which stdin doesn't carry, and a 429 there now backs off exponentially instead of retrying on every repaint.
+Optional command installation:
 
-**Refresh cadence:** Claude Code repaints on its own events (prompt, tool use), which covers anything derived from stdin. Content that moves with the clock — animation frames, the focus countdown, the heartbeat's elapsed time — also needs a timer, so `--install` sets `statusLine.refreshInterval` (2s when animating, 15s for time-based widgets, omitted entirely for a static bar). It is re-synced automatically whenever you change a setting.
+```sh
+python -m pip install .
+codexpulse --preview
+codexpulse --watch --cwd /path/to/project
+```
 
-**PostToolUse hook:** When installed, the hook fires on every tool call (Read, Edit, Bash, etc.), updating the heartbeat counter and git branch. The status line refreshes on each tool call, making the spinner animate during active work.
+Pip installs the companion command. `--launch` and `--install-skill` require the git checkout because they use its companion files. On Windows, npm's Codex shim is resolved through Node with argument arrays, including paths containing spaces. `CODEXPULSE_CODEX` can select a native Codex executable explicitly.
+
+</details>
+
+## Why CodexPulse
+
+- **Codex-native data.** Quotas come through `codex app-server` using your existing login. Pulse never reads or refreshes your authentication tokens itself. [Official app-server API](https://learn.chatgpt.com/docs/app-server)
+- **Real window durations.** Five-hour, weekly, and other windows are classified from their reported duration. A weekly primary window stays weekly.
+- **Model-specific limits.** Additional buckets use the labels Codex provides; no hardcoded Claude models or imaginary per-model caps.
+- **Fifteen themes, five animation modes, eight bar styles.** Familiar Pulse customization in the companion.
+- **Honest context and costs.** Context uses the latest request's tokens, never cumulative session tokens. Missing measurements stay unknown. Cost appears only when Codex provides an estimate.
+- **Quiet refreshes.** Local display refresh and animation are separate from network polling; quota reads are cached for 60 seconds by default, with failure backoff.
+- **Reversible setup.** Codex writes its own configuration. Pulse keeps a backup and refuses to overwrite later user edits during uninstall.
+
+## Feature tour
+
+| Feature | What CodexPulse provides |
+|---|---|
+| Session and weekly usage | Actual used percentages, local reset time, countdown, and expired-data markers |
+| Additional model budgets | Every model/limit bucket the account reports, with its actual window duration |
+| Context pressure | Last reported context percentage, token count, and a warning at 90% |
+| Model and reasoning | Current thread model and effort, plus observed fast/priority service tier when recorded |
+| Token detail | Cumulative input, output, reasoning, total tokens, and cached-input share |
+| Git context | Branch, worktree, changed-file count, tracked working-tree diff, ahead/behind upstream |
+| Live companion | Independent animation frames, periodic metadata reads, and configuration reloads |
+| Activity | Last recorded activity, tool count, last tool, elapsed time, and recorded compactions |
+| Agents | Direct children present in the latest 100 subagent results; server-reported activity is shown without guessing |
+| Costs and budget | Codex-provided thread cost estimate where supported, an optional USD ceiling, and explicit currency conversion |
+| Focus timer | Start, pause, resume, stop, and completion indicator |
+| Trends | Local quota sparkline, observed burn rate, approximate runway, and usage-versus-time pace |
+| Account stats | Official lifetime tokens, activity streak, and daily token heatmap when available |
+| Layout | Four layouts, widget priorities, optional second row, Unicode-aware width fitting and wrapping |
+| Configuration | Preview, fifteen-theme picker, presets, twenty-step undo, and `$codexpulse` helper |
+| Maintenance | Doctor, explicit release checks, clean-tree fast-forward updates, and reversible native install |
+
+<details>
+<summary><strong>What changes from Claude Pulse?</strong></summary>
+
+This is a Codex adaptation, with different integration boundaries. It does **not** claim exact Claude-plugin parity:
+
+| Claude Pulse feature | Codex adaptation / boundary |
+|---|---|
+| Custom in-process status-line script | Native footer setup plus a separate full-featured companion pane |
+| Opus / Sonnet / Fable caps | Codex-reported bucket names and windows only |
+| Claude hook heartbeat and subagent rows | Local Codex rollout activity and optional child-thread summaries; no Claude hooks installed |
+| Claude's session cost field | Codex thread cost estimate when available; hidden otherwise, including unsupported subscription routes |
+| Live FX and cumulative monetary cost | Explicit exchange rate; official account token totals replace unsupported account money totals |
+| Session lines changed | Current Git working-tree diff against HEAD; includes staged and unstaged tracked changes, excludes untracked contents |
+| Clickable PR widget | Use Codex's own `/statusline` picker for PR support when offered by your CLI version |
+| Per-agent context rows / spawn caps | Not installed; Codex does not expose Claude's `subagentStatusLine` contract or its spawn budgets |
+| Context velocity alerts and celebration effects | Current-pressure warning and quota trends; no speculative velocity alert or reset celebration |
+| Automatic update badges | Explicit `--check-updates`; no background release requests |
+
+Unknown data is omitted or marked `?`. The companion follows the latest stored thread in the chosen directory, which can be an existing app or CLI session until the new CLI persists a turn. Use `--thread <id>` to pin a particular session. The native footer always belongs to its own CLI session.
+
+Activity and context are **last recorded telemetry**, not a direct subscription to another CLI process. A separate app server may report child threads as `notLoaded`; Pulse does not label that state as active. Rollout reads are bounded to 4 MiB on initial load and incremental afterwards. A partial history labels its tool count as **recent tools**. This local rollout format is an unstable compatibility fallback; missing/changed fields remain unknown.
+
+</details>
 
 ## Themes
 
 <p align="center">
-  <img src="themes.png" alt="All 10 themes" width="700" />
+  <img src="assets/themes.png" alt="The fifteen CodexPulse theme palettes at low, medium, and high usage" width="900" />
 </p>
 
-10 built-in themes with colour-coded bars that shift as usage increases. Set with `--theme <name>` or `/pulse <name>`.
+`rainbow`, `default`, `ocean`, `frost`, `ember`, `candy`, `contrast`, `pride`, `mono`, `catppuccin`, `dracula`, `gruvbox`, `nord`, `rose-pine`, `tokyo-night`.
 
-## Animation Modes
+```sh
+python codex_status.py --theme ocean
+python codex_status.py --show-themes
+python codex_status.py --pick-theme
+python codex_status.py --theme candy --preview
+```
 
-| Mode | Effect |
+The picker accepts a theme name or number, previews all themes, and saves only the chosen result. `--preview` and `--show-themes` are offline dry runs. Themes apply to the companion. Configure Codex's own appearance with its native controls.
+
+### Animation and bar styles
+
+```sh
+python codex_status.py --animate rainbow --animation-speed normal
+python codex_status.py --bar-style braille --bar-size medium
+```
+
+| Animation | Effect |
 |---|---|
-| `off` | Static, no animation |
-| `rainbow` | Flowing rainbow gradient across the entire bar |
-| `pulse` | Bars cycle through vivid colours (cyan → blue → purple → pink → gold → green) |
-| `glow` | Per-character gradient that shifts across the bar each frame |
-| `shift` | Bright highlight slides across the bar |
+| `off` | Static |
+| `rainbow` | Moving rainbow across filled bar cells |
+| `pulse` | Filled bars cycle through colors together |
+| `glow` | Brightness wave across the filled bar |
+| `shift` | Moving highlight |
 
-Set with `--animate <mode>`. Animation advances on every repaint — Claude Code's own events plus the 2-second `refreshInterval` that `--install` configures while animation is on, so the bar keeps moving even while the session is idle.
+Styles: `classic`, `block`, `shade`, `pipe`, `dot`, `square`, `star`, `braille`. Sizes: `small`, `small-medium`, `medium`, `medium-large`, `large`. Animations repaint at five frames per second in watch mode without extra quota requests. Minimal layout has colored percentages and no bars to animate. `NO_COLOR` and `--plain` disable ANSI color; `--color-depth` supports truecolor, 256, and 16-color terminals.
 
-## Requirements
+## Configure it by talking to it
 
-- **Python 3.8+** (no pip installs needed)
-- **Claude Code** v2.1.80+ with a Pro or Max subscription (Fable reporting needs v2.1.170+)
-- No API key required — uses Claude Code's existing credentials
+After installation, start a new Codex session and type:
 
-## Security
+```text
+$codexpulse make it ocean blue and show cache efficiency
+$codexpulse put model and reasoning on a second line
+$codexpulse start a 25-minute focus timer
+```
 
-- **No API calls for usage data** — reads rate limits directly from Claude Code's stdin (v2.1.80+)
-- OAuth tokens only used as fallback for extra credits/per-model caps, sent only to `api.anthropic.com` (hardcoded allowlist)
-- All file writes use atomic operations with 0o600 permissions
-- ANSI escape injection prevention on all external data
-- Hyperlink targets (PR badge) restricted to `http(s)` and rejected if they contain control characters, so nothing can break out of the OSC 8 escape
-- No `shell=True` in any subprocess call
-- Exchange rate API (frankfurter.app) — no auth, read-only, cached 24h
+The installer copies the helper skill to your Codex skills directory. A validated plugin manifest and the same skill are also included under `plugins/codexpulse` for custom marketplace packaging. The helper configures the installed project; it is not a custom footer renderer inside Codex.
 
-## Troubleshooting
+<details>
+<summary><strong>Configuration reference</strong></summary>
 
-| Issue | Fix |
-|---|---|
-| No status line visible | Run `--install` then restart Claude Code |
-| "Rate limited" message | v3.0.0+ reads limits from stdin, so the bars keep working. v3.2.0+ also backs off exponentially before retrying the API |
-| Animation/timer frozen when idle | Re-run `--install` on v3.2.0+. Earlier versions wrote a `refresh` key that Claude Code ignores; the real setting is `refreshInterval` |
-| Opus/Sonnet/Fable bar missing | Those bars render only when your plan reports that cap. Claude Pro returns `null` for the model-scoped windows |
-| Heartbeat not showing | Run `--install-hooks` then restart Claude Code. Shows after first tool call |
-| Heartbeat appears/disappears | Normal — shows when hook state is fresh (within 5 min of last tool call) |
-| Settings error after hook install | Run `/doctor` — hooks need nested format: `{matcher, hooks: [{type, command}]}` |
-| Stale data showing | Data refreshes on every interaction. If idle, it shows the last known state |
-| Unicode characters broken | Try `--bar-style block` for better Windows terminal support |
+```sh
+# Exact compact arrangement, with only the available quota windows
+python codex_status.py --preset minimal --layout minimal --native-mode off
 
-## Support
+# Rich display with a second row
+python codex_status.py --preset full --line2 model,effort,branch,tokens,cache
 
-If this project helped you, consider starring the repo, sharing it with others, or buying me a coffee.
+# Complement the native footer in a short companion pane
+python codex_status.py --native-mode auto --no-header --bar-style dot --animate glow
 
-<a href="https://buymeacoffee.com/noobygains"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200" /></a>
+# Toggle / order widgets
+python codex_status.py --show cache,tokens,focus --hide branch
+python codex_status.py --priority model=0,session=10,weekly=20
 
-## Star History
+# Pin a session instead of following the latest one in a directory
+python codex_status.py --watch --thread YOUR_THREAD_ID
 
-<!-- Rendered weekly by .github/workflows/star-history.yml — GitHub restricted
-     the stargazers API (June 2026), so third-party live charts no longer work
-     for public visitors; the repo renders and commits its own. -->
-<a href="https://github.com/NoobyGains/claude-pulse/stargazers">
-   <picture>
-     <source media="(prefers-color-scheme: dark)" srcset="assets/star-history-dark.svg" />
-     <source media="(prefers-color-scheme: light)" srcset="assets/star-history.svg" />
-     <img alt="Star History Chart" src="assets/star-history.svg" width="700" />
-   </picture>
-</a>
+# Configure reset labels and optional estimated spend
+python codex_status.py --clock 24h
+python codex_status.py --show cost,budget --budget 20
+python codex_status.py --currency SGD --fx-rate 1.30
 
-## License
+# Timers, history, and account activity
+python codex_status.py --focus start 25
+python codex_status.py --focus pause
+python codex_status.py --focus resume
+python codex_status.py --focus stop
+python codex_status.py --show sparkline,burn_rate,runway,pace
+python codex_status.py --stats
+python codex_status.py --heatmap
 
-MIT — see [LICENSE](LICENSE) for details.
+# Read, preview, recover
+python codex_status.py --json --cwd /path/to/project
+python codex_status.py --config
+python codex_status.py --undo
+python codex_status.py --reset
+python codex_status.py --native-preview --preset minimal
+```
 
----
+The `1.30` exchange rate above is an example, **not a live quote**. Supply your intended USD conversion rate. Spend widgets are estimates, not invoices; a configured budget is a visual indicator and does not stop Codex spending.
 
-<p align="center">
-  Made by <a href="https://github.com/NoobyGains">NoobyGains</a> · <a href="https://www.reddit.com/user/PigeonDroid/">PigeonDroid</a>
-</p>
+Available widgets:
+
+```text
+session weekly limits context model effort branch
+tokens input output reasoning cache context_tokens plan credits reset_credits
+fast activity heartbeat last_tool elapsed focus cost budget files lines
+git_drift worktree agents streak lifetime sparkline burn_rate runway pace
+version compactions
+```
+
+Configuration lives in `~/.codexpulse/config.json`. The default quota cache is 60 seconds (minimum 30); metadata refresh is 10 seconds (minimum 2). Account activity and cost reads cache for five minutes. Reset times use your machine's local timezone. Historical quota percentages are reset-window scoped. Runway is a linear estimate based on locally observed usage, not a promise of available time. `--no-header` hides the watch banner; small panes suppress it automatically to leave room for usage.
+
+</details>
+
+## Troubleshooting and updates
+
+```sh
+python codex_status.py --doctor --cwd /path/to/project
+python codex_status.py --check-updates
+python codex_status.py --update
+python codex_status.py --uninstall
+```
+
+- **No quotas:** run `codex login`, then check `codex` → `/status`. API-key-only or unsupported auth routes may have no ChatGPT quota windows.
+- **No context:** send a turn in the selected project, or pin `--thread`. Context needs a recorded token event.
+- **Wrong session:** use `--cwd` or `--thread`; the companion does not assume that every terminal belongs to the same thread.
+- **No colors:** use a terminal with ANSI support, remove `NO_COLOR`, or set `--color-depth truecolor`.
+- **Footer unchanged:** restart Codex CLI. The desktop application's UI is separate.
+- **Uninstall refuses:** your Codex config changed after installation. Compare `~/.codexpulse/native-backup.json` or use `/statusline`; your newer edits are preserved. `--uninstall` restores the footer/config backup, not the source checkout or optional helper skill.
+
+Updates require a clean checkout on `main` with the official CodexPulse origin and use `git pull --ff-only`. They never pull Claude Pulse into CodexPulse. The original source is retained as the read-only `upstream` remote in development.
+
+## Development
+
+```sh
+python -m unittest discover -s tests -v
+python codex_status.py --preview --plain
+```
+
+The suite covers window classification, token accounting, partial writes, compaction, rendering width, configuration rollback, RPC timeouts, caching, and safe native installation. GitHub Actions runs it on Windows, macOS, and Linux with Python 3.11 and 3.14. Live integration was verified with Codex CLI 0.154.0 on Windows; other CLI versions may expose fewer fields. The app-server interface is experimental.
+
+README artwork is synthetic and reproducible with `python scripts/generate_artwork.py` (Pillow is an optional development-only dependency). No account data or screenshots are included in the artwork.
+
+## Credits and license
+
+Adapted from [Claude Pulse](https://github.com/NoobyGains/claude-pulse) by PigeonDroid / NoobyGains. The project preserves its Git history and original license. Codex-specific code is separated from the Claude implementation; the newer local Pulse palette improvements are retained. See [research and feature mapping](docs/RESEARCH.md) for the source revisions and integration decisions.
+
+**Source Available**, under the [included license](LICENSE). This project is not affiliated with or endorsed by OpenAI.

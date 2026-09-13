@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codexpulse"
+version = "0.1.0"
+description = "Pulse-style usage monitoring and native status-line setup for Codex CLI"
+requires-python = ">=3.11"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [{name = "NoobyGains"}]
+dependencies = []
+
+[project.scripts]
+codexpulse = "codexpulse.cli:main"
+
+[tool.setuptools]
+packages = ["codexpulse"]
+
+[tool.setuptools.package-data]
+codexpulse = ["themes.json"]

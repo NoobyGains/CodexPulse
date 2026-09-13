@@ -1,3 +1,11 @@
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+.venv/
+.env*
+.research/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+*.bak
+*.log

@@ -1,0 +1,317 @@
+{
+  "rainbow": {
+    "low": "#4ade80",
+    "mid": "#fbbf24",
+    "high": "#e879f9",
+    "track": "#767e8a",
+    "c256": [
+      42,
+      214,
+      213,
+      244
+    ],
+    "c16": [
+      92,
+      93,
+      95,
+      90
+    ],
+    "demo_text": "none",
+    "text_default": "none",
+    "desc": "Full-spectrum colour flowing across the bar, animated"
+  },
+  "default": {
+    "low": "#4ade80",
+    "mid": "#fbbf24",
+    "high": "#ff8272",
+    "track": "#767e8a",
+    "c256": [
+      42,
+      214,
+      210,
+      244
+    ],
+    "c16": [
+      92,
+      93,
+      91,
+      90
+    ],
+    "demo_text": "green",
+    "text_default": "white",
+    "desc": "Classic green to amber to red, retuned for legibility"
+  },
+  "ocean": {
+    "low": "#22d3ee",
+    "mid": "#60a5fa",
+    "high": "#e879f9",
+    "track": "#6b7f95",
+    "c256": [
+      45,
+      75,
+      213,
+      67
+    ],
+    "c16": [
+      96,
+      94,
+      95,
+      90
+    ],
+    "demo_text": "cyan",
+    "text_default": "white",
+    "desc": "Cool cyan to azure to fuchsia, no red anywhere"
+  },
+  "frost": {
+    "low": "#7dd3fc",
+    "mid": "#38bdf8",
+    "high": "#ffffff",
+    "track": "#6d8397",
+    "c256": [
+      117,
+      74,
+      231,
+      67
+    ],
+    "c16": [
+      96,
+      94,
+      97,
+      90
+    ],
+    "demo_text": "cyan",
+    "text_default": "white",
+    "desc": "Sky to vivid blue to white, cold and bright"
+  },
+  "ember": {
+    "low": "#fcd34d",
+    "mid": "#fb923c",
+    "high": "#ff8465",
+    "track": "#8a7a63",
+    "c256": [
+      221,
+      172,
+      209,
+      101
+    ],
+    "c16": [
+      93,
+      33,
+      91,
+      90
+    ],
+    "demo_text": "yellow",
+    "text_default": "white",
+    "desc": "Gold to orange to coral, one warm hue burning hotter"
+  },
+  "candy": {
+    "low": "#ff9ee0",
+    "mid": "#c084fc",
+    "high": "#5eead4",
+    "track": "#8a7a92",
+    "c256": [
+      219,
+      141,
+      122,
+      103
+    ],
+    "c16": [
+      95,
+      94,
+      96,
+      90
+    ],
+    "demo_text": "pink",
+    "text_default": "white",
+    "desc": "Pink to purple to mint, a sweet shop on a dark terminal"
+  },
+  "contrast": {
+    "low": "#6cc6ff",
+    "mid": "#ffd166",
+    "high": "#ffffff",
+    "track": "#78828e",
+    "c256": [
+      117,
+      221,
+      231,
+      244
+    ],
+    "c16": [
+      96,
+      93,
+      97,
+      90
+    ],
+    "demo_text": "cyan",
+    "text_default": "white",
+    "desc": "Blue to gold to white, built for colour vision deficiency"
+  },
+  "pride": {
+    "low": "#a78bfa",
+    "mid": "#34d399",
+    "high": "#ff85c8",
+    "track": "#7c7a90",
+    "c256": [
+      141,
+      43,
+      212,
+      103
+    ],
+    "c16": [
+      94,
+      92,
+      95,
+      90
+    ],
+    "demo_text": "violet",
+    "text_default": "white",
+    "desc": "Violet to emerald to pink, loud and cheerful"
+  },
+  "mono": {
+    "low": "#9ca3af",
+    "mid": "#d4d4d8",
+    "high": "#ffffff",
+    "track": "#808080",
+    "c256": [
+      247,
+      188,
+      231,
+      244
+    ],
+    "c16": [
+      37,
+      97,
+      97,
+      90
+    ],
+    "demo_text": "white",
+    "text_default": "white",
+    "desc": "Neutral greyscale, grey to pale to white"
+  },
+  "catppuccin": {
+    "low": "#a6e3a1",
+    "mid": "#f9e2af",
+    "high": "#f38ba8",
+    "track": "#7f849c",
+    "c256": [
+      150,
+      223,
+      211,
+      103
+    ],
+    "c16": [
+      92,
+      93,
+      95,
+      90
+    ],
+    "demo_text": "white",
+    "text_default": "white",
+    "desc": "Catppuccin Mocha's green, yellow and red"
+  },
+  "dracula": {
+    "low": "#50fa7b",
+    "mid": "#ffb86c",
+    "high": "#ff79c6",
+    "track": "#7282b4",
+    "c256": [
+      84,
+      215,
+      212,
+      103
+    ],
+    "c16": [
+      92,
+      93,
+      95,
+      90
+    ],
+    "demo_text": "pink",
+    "text_default": "white",
+    "desc": "Dracula's green, orange and pink"
+  },
+  "gruvbox": {
+    "low": "#b8bb26",
+    "mid": "#fabd2f",
+    "high": "#fe8019",
+    "track": "#928374",
+    "c256": [
+      142,
+      178,
+      208,
+      102
+    ],
+    "c16": [
+      92,
+      93,
+      91,
+      90
+    ],
+    "demo_text": "yellow",
+    "text_default": "white",
+    "desc": "Gruvbox dark's retro green, gold and orange"
+  },
+  "nord": {
+    "low": "#a3be8c",
+    "mid": "#ebcb8b",
+    "high": "#d08770",
+    "track": "#7b88a1",
+    "c256": [
+      108,
+      222,
+      173,
+      103
+    ],
+    "c16": [
+      92,
+      93,
+      91,
+      90
+    ],
+    "demo_text": "cyan",
+    "text_default": "white",
+    "desc": "Nord's Aurora green, yellow and orange"
+  },
+  "rose-pine": {
+    "low": "#9ccfd8",
+    "mid": "#f6c177",
+    "high": "#eb6f92",
+    "track": "#8880a6",
+    "c256": [
+      152,
+      222,
+      211,
+      103
+    ],
+    "c16": [
+      96,
+      93,
+      95,
+      90
+    ],
+    "demo_text": "pink",
+    "text_default": "white",
+    "desc": "Rose Pine's foam, gold and love"
+  },
+  "tokyo-night": {
+    "low": "#9ece6a",
+    "mid": "#e0af68",
+    "high": "#f7768e",
+    "track": "#787c99",
+    "c256": [
+      149,
+      179,
+      211,
+      103
+    ],
+    "c16": [
+      92,
+      93,
+      91,
+      90
+    ],
+    "demo_text": "violet",
+    "text_default": "white",
+    "desc": "Tokyo Night's green, amber and red"
+  }
+}
