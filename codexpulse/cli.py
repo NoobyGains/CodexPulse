@@ -17,11 +17,12 @@ from . import native
 from .render import ANIMATIONS, STYLES, THEMES, WIDGETS, clean, demo, render, watch_rows
 from .rpc import Client, RpcError, codex_command
 from .storage import DEFAULTS, config, home, read_json, save_config, undo, write_json
+from .terminal import TerminalOutput
 
 PRESETS = {
     "minimal": ["session", "weekly", "limits", "context"],
     "balanced": DEFAULTS["widgets"],
-    "full": ["session", "weekly", "limits", "context", "model", "effort", "branch", "tokens", "cache", "activity", "heartbeat", "focus", "files", "lines", "plan", "credits"],
+    "full": ["session", "weekly", "limits", "context", "model", "effort", "branch", "tokens", "cache", "activity", "heartbeat", "focus", "files", "lines", "plan", "credits", "tasks", "active_tools", "git_status", "stash", "project"],
 }
 
 def parser():
@@ -32,8 +33,15 @@ def parser():
         help="show or hide the companion banner (saved; --no-header hides it)")
     p.add_argument("--native-mode", choices=("auto", "off"),
         help="auto complements configured Codex footer fields; off shows all Pulse fields")
+    p.add_argument("--spark", action=argparse.BooleanOptionalAction, default=None,
+        help="show Spark model quota windows (saved; hidden by default; --no-spark hides them)")
     p.add_argument("--launch", action="store_true", help="open Codex above a Pulse pane in Windows Terminal")
-    p.add_argument("--cwd", default=os.getcwd(), help="monitor the latest session in this directory")
+    p.add_argument("--attach", action="store_true", help="add only a Pulse pane to the current Windows Terminal window")
+    p.add_argument("--redraw", choices=("changes", "live"), help="changes redraws changed content; live enables animation (saved)")
+    p.add_argument("--ascii", action=argparse.BooleanOptionalAction, default=None, help="portable ASCII bars and labels (saved)")
+    p.add_argument("--lock-session", action="store_true", help="follow the first matching session until this watcher exits")
+    p.add_argument("--started-after", type=float, help=argparse.SUPPRESS)
+    p.add_argument("--cwd", nargs="?", const=os.getcwd(), default=os.getcwd(), help="monitor this folder; defaults to the current folder")
     p.add_argument("--thread", help="pin an exact Codex thread ID")
     p.add_argument("--refresh", type=float, help="metadata refresh seconds, minimum 2; quota is cached separately")
     p.add_argument("--json", action="store_true", help="emit normalized metadata as JSON")
@@ -86,10 +94,15 @@ def validate(cfg):
     for key, choices in (("theme", THEMES), ("animate", ANIMATIONS), ("bar_style", STYLES),
         ("layout", ("standard", "compact", "minimal", "percent-first")), ("wrap", ("auto", "off")),
         ("native_mode", ("auto", "off")),
+        ("redraw", ("changes", "live")),
         ("animation_speed", ("slow", "normal", "fast")), ("clock", ("12h", "24h")),
         ("color_depth", ("auto", "none", "truecolor", "256", "16"))):
         if cfg.get(key) not in choices:
             raise ValueError(f"Invalid {key} in configuration")
+    if not isinstance(cfg.get("spark", False), bool):
+        raise ValueError("spark must be true or false")
+    if not isinstance(cfg.get("ascii", False), bool):
+        raise ValueError("ascii must be true or false")
     if not isinstance(cfg.get("header"), bool):
         raise ValueError("header must be true or false")
     for key in ("widgets", "line2_widgets"):
@@ -112,7 +125,7 @@ def configure(args):
     if args.preset:
         cfg["widgets"], cfg["line2_widgets"], cfg["priority"] = list(PRESETS[args.preset]), [], {}
         changed = True
-    for key in ("theme", "animate", "animation_speed", "bar_style", "layout", "wrap", "color_depth", "clock", "refresh", "budget", "currency", "fx_rate", "header", "native_mode"):
+    for key in ("theme", "animate", "animation_speed", "bar_style", "layout", "wrap", "color_depth", "clock", "refresh", "budget", "currency", "fx_rate", "header", "native_mode", "spark", "redraw", "ascii"):
         value = getattr(args, key)
         if value is not None:
             cfg[key] = value.upper() if key == "currency" else value
@@ -164,18 +177,71 @@ def focus_action(words):
     write_json(path, value)
     print("Focus " + action)
 
-def launch_command(cwd, thread=None):
-    wt = shutil.which("wt")
+def terminal_executable():
+    override = os.environ.get("CODEXPULSE_TERMINAL")
+    if override:
+        if not Path(override).is_file():
+            raise ValueError("CODEXPULSE_TERMINAL must point to a Windows Terminal executable")
+        return override
+    found = shutil.which("wt")
+    # Execution aliases can silently exit from background processes.
+    if found and os.name == "nt" and Path(found).is_file() and Path(found).stat().st_size == 0:
+        shell = shutil.which("pwsh") or shutil.which("powershell")
+        if shell:
+            try:
+                result = subprocess.run([shell, "-NoProfile", "-NonInteractive", "-Command",
+                    "(Get-AppxPackage Microsoft.WindowsTerminal).InstallLocation"],
+                    capture_output=True, text=True, timeout=8, creationflags=subprocess.CREATE_NO_WINDOW)
+                path = Path(result.stdout.strip()) / "WindowsTerminal.exe"
+                if result.returncode == 0 and path.is_file():
+                    return str(path)
+            except (OSError, subprocess.SubprocessError):
+                pass
+    return found
+
+
+def open_terminal(command):
+    if os.name == "nt":
+        import ctypes
+        shell = ctypes.WinDLL("shell32", use_last_error=True)
+        activate = shell.ShellExecuteW
+        activate.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_wchar_p,
+                             ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_int]
+        activate.restype = ctypes.c_void_p
+        result = activate(None, "open", command[0], subprocess.list2cmdline(command[1:]), None, 1)
+        if not result or result <= 32:
+            raise OSError(f"Windows Terminal could not open (shell error {result})")
+    else:
+        subprocess.run(command, check=True, timeout=15)
+
+
+def launch_command(cwd, thread=None, attach=False, plain=False):
+    wt = terminal_executable()
     if not wt:
         raise ValueError("Windows Terminal (wt) is required for --launch. Elsewhere run --watch in a split terminal pane.")
     script = Path(__file__).resolve().parents[1] / "codex_status.py"
     if not script.is_file():
         raise ValueError("--launch requires a git checkout. Run codexpulse --watch in a separate pane for pip installs.")
     watch = [sys.executable, str(script), "--watch", "--cwd", str(Path(cwd).resolve())]
-    codex = codex_command()
+    if plain:
+        watch.append("--plain")
     if thread:
         watch += ["--thread", thread]
-        codex += ["resume", thread]
+    else:
+        watch += ["--lock-session"]
+        if not attach:
+            watch += ["--started-after", str(time.time())]
+    if any(";" in arg for arg in watch):
+        raise ValueError("Windows Terminal pane paths and thread IDs cannot contain semicolons")
+    if attach:
+        window = os.environ.get("WT_SESSION")
+        if not window:
+            raise ValueError("--attach requires PowerShell inside Windows Terminal. Use --launch to open a combined window.")
+        return [wt, "-w", window, "split-pane", "-H", "--size", ".18", "-d", str(Path(cwd).resolve()),
+            *watch, ";", "move-focus", "up"]
+    codex = codex_command() + (["resume", thread] if thread else [])
+    if any(";" in arg for arg in codex):
+        raise ValueError("Windows Terminal executable paths cannot contain semicolons")
     return [wt, "new-tab", "--title", "CodexPulse", "-d", str(Path(cwd).resolve()), *codex,
         ";", "split-pane", "-H", "--size", ".2", "-d", str(Path(cwd).resolve()), *watch,
         ";", "move-focus", "up"]
@@ -201,37 +267,39 @@ def check_updates():
     except OSError:
         print("Release information unavailable. Installed " + __version__)
 
-def watch(monitor, cfg, args):
+def watch(monitor, cfg, args, terminal):
     if not sys.stdout.isatty():
         raise ValueError("--watch needs an interactive terminal; use --json or a one-shot command when piping")
     next_read, frame, snapshot = 0, 0, {}
-    print("\x1b[?1049h\x1b[?25l", end="", flush=True)
-    try:
-        while True:
-            now = time.monotonic()
-            if now >= next_read:
-                fresh = config()
-                validate(fresh)
-                cfg = fresh
-                snapshot = monitor.collect(cfg)
-                snapshot["samples"] = record_sample(snapshot)
-                next_read = now + cfg["refresh"]
-            elapsed = max(0, time.time() - snapshot.get("at", time.time()))
-            live = snapshot | {"at": time.time(), "age": snapshot.get("age", 0) + elapsed}
-            width, height = shutil.get_terminal_size((120, 20))
-            width = max(10, min(args.width or width, width) - 1)
-            rows = watch_rows(live, cfg, width, height, args.thread, args.plain, frame)
-            print("\x1b[H" + "\n".join(rows) + "\x1b[J", end="", flush=True)
-            frame += 1
-            time.sleep(.2 if cfg["animate"] != "off" or cfg["theme"] == "rainbow" else 1)
-    finally:
-        print("\x1b[0m\x1b[?25h\x1b[?1049l", end="", flush=True)
+    terminal.start()
+    while True:
+        now = time.monotonic()
+        if now >= next_read:
+            fresh = config()
+            validate(fresh)
+            cfg = fresh if terminal.ansi else fresh | {"ascii": True}
+            snapshot = monitor.collect(cfg)
+            snapshot["samples"] = record_sample(snapshot)
+            next_read = now + cfg["refresh"]
+        elapsed = max(0, time.time() - snapshot.get("at", time.time()))
+        live = snapshot | {"at": time.time(), "age": snapshot.get("age", 0) + elapsed}
+        width, height = shutil.get_terminal_size((120, 20))
+        width = max(1, min(args.width or width, width) - 1)
+        animate = cfg["redraw"] == "live" and terminal.ansi and not args.plain and "NO_COLOR" not in os.environ
+        rows = watch_rows(live, cfg, width, height, getattr(monitor, "thread_id", args.thread), args.plain, frame if animate else 0)
+        terminal.draw(rows, (width, height))
+        frame += 1
+        time.sleep(.2 if animate and (cfg["animate"] != "off" or cfg["theme"] == "rainbow") else 1)
 
-def main(argv=None):
+def run(argv, terminal):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     args = parser().parse_args(argv)
+    launch_plain = args.plain
+    args.plain = args.plain or not terminal.ansi
     try:
+        if args.launch and args.attach:
+            raise ValueError("Choose --launch or --attach")
         if args.undo:
             undo()
             print("Restored previous display configuration")
@@ -259,8 +327,8 @@ def main(argv=None):
             print("Installed $codexpulse helper. Start a new Codex session to use it.")
         elif args.uninstall:
             print("Restored " + str(native.uninstall()))
-        elif args.launch:
-            subprocess.run(launch_command(args.cwd, args.thread), check=True, timeout=15)
+        elif args.launch or args.attach:
+            open_terminal(launch_command(args.cwd, args.thread, args.attach, launch_plain))
         elif args.widgets:
             print(", ".join(WIDGETS))
         elif args.config:
@@ -307,14 +375,15 @@ def main(argv=None):
                     else:
                         print(json.dumps(value.get("summary") or {}, indent=2))
                     return 1 if error else 0
-                monitor = Monitor(client, args.cwd, args.thread)
+                monitor = Monitor(client, args.cwd, args.thread, args.lock_session, args.started_after)
                 if args.watch:
-                    watch(monitor, cfg, args)
+                    watch(monitor, cfg, args, terminal)
                 else:
                     snapshot = monitor.collect(cfg)
                     snapshot["samples"] = record_sample(snapshot)
                     if args.doctor:
                         print("Codex app server: connected")
+                        print("Terminal renderer: " + ("ANSI enabled" if terminal.ansi else "Windows console fallback" if terminal.console else "plain (redirected or unsupported terminal)"))
                         print("Quota windows: " + str(len(snapshot.get("windows", []))))
                         print("Matching session: " + ("yes" if snapshot.get("thread", {}).get("id") else "none in this directory"))
                         print("Context telemetry: " + ("available" if snapshot.get("context") is not None else "unavailable (send a turn or pin --thread)"))
@@ -327,6 +396,11 @@ def main(argv=None):
     except (ValueError, OSError, RpcError, subprocess.SubprocessError) as exc:
         print("CodexPulse: " + clean(exc), file=sys.stderr)
         return 1
+
+def main(argv=None):
+    with TerminalOutput() as terminal:
+        return run(argv, terminal)
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

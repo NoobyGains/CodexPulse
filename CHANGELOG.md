@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Fix raw ANSI color/cursor codes in Windows consoles by enabling VT output and restoring console state; fall back to native console drawing and ASCII when VT is unavailable.
+- Skip unchanged watch frames by default; retain optional animation with `--redraw live`.
+- Keep the compact Pulse display and add opt-in task progress, active tools, Git status, stash, and project widgets.
+- Add ASCII display mode, current-window pane attachment, session locking, and visible shell activation for Windows Terminal execution aliases.
+- Accept a bare `--cwd` as the current directory.
+- Preserve responsive wrapping, height adaptation, and opt-in Spark filtering.
+- Document reference implementations and their MIT license notices.
+- Verify rendering through real Windows console screen-buffer tests.
+
 ## 0.1.0 — 2026-09-13
 
 - Adapt Pulse to Codex with a reversible native footer installer and full terminal companion.

@@ -65,6 +65,7 @@ class RolloutReader:
         self.path = None
         self.offset = 0
         self.state = {}
+        self.active_calls = {}
 
     def read(self, path):
         if not path or not Path(path).is_file():
@@ -74,6 +75,7 @@ class RolloutReader:
             size = path.stat().st_size
             if path != self.path or size < self.offset:
                 self.path, self.offset, self.state = path, 0, {}
+                self.active_calls = {}
             with path.open("rb") as stream:
                 if size - self.offset > 4 * 1024 * 1024:
                     self.offset = size - 4 * 1024 * 1024
@@ -112,13 +114,41 @@ class RolloutReader:
                 self.state["rate_limits"] = payload["rate_limits"]
         elif kind == "event_msg" and payload.get("type") in ("task_started", "task_complete", "task_aborted"):
             self.state["activity"] = "working" if payload["type"] == "task_started" else "idle"
+            self.active_calls.clear()
+            self.state["active_tools"] = []
         elif kind == "response_item" and payload.get("type") in ("function_call", "custom_tool_call"):
             self.state["tools"] = self.state.get("tools", 0) + 1
             self.state["last_tool"] = payload.get("name")
+            call_id, name = payload.get("call_id"), payload.get("name")
+            if isinstance(call_id, str) and isinstance(name, str):
+                self.active_calls[call_id] = name[:120]
+                if len(self.active_calls) > 256:
+                    self.active_calls.pop(next(iter(self.active_calls)))
+                    self.state["partial"] = True
+                self.state["active_tools"] = list(self.active_calls.values())
+            if isinstance(name, str) and name.rsplit(".", 1)[-1] == "update_plan":
+                try:
+                    raw = payload.get("arguments", "")
+                    plan = (json.loads(raw) if isinstance(raw, str) else raw).get("plan")
+                    if isinstance(plan, list) and all(isinstance(p, dict) and p.get("status") in
+                            ("pending", "in_progress", "completed") for p in plan):
+                        self.state["tasks"] = {"total": len(plan),
+                            "completed": sum(p["status"] == "completed" for p in plan),
+                            "in_progress": sum(p["status"] == "in_progress" for p in plan)}
+                except (ValueError, TypeError, AttributeError):
+                    pass
+        elif kind == "response_item" and payload.get("type") in ("function_call_output", "custom_tool_call_output"):
+            call_id = payload.get("call_id")
+            if isinstance(call_id, str):
+                self.active_calls.pop(call_id, None)
+                self.state["active_tools"] = list(self.active_calls.values())
         elif kind == "compacted":
             self.state["compactions"] = self.state.get("compactions", 0) + 1
             # Context before compaction no longer describes the current window.
             self.state.pop("tokens", None)
+            self.active_calls.clear()
+            self.state.pop("active_tools", None)
+
 
 def token_metrics(info):
     last = info.get("last_token_usage") or info.get("last") or {}
@@ -135,7 +165,7 @@ def token_metrics(info):
         "reasoning_tokens": number(get(total, "reasoningOutputTokens", "reasoning_output_tokens")),
         "cache": min(100, max(0, cached / inp * 100)) if inp and inp > 0 and cached is not None else None}
 
-def git_metrics(cwd):
+def git_metrics(cwd, extra=False):
     result = {}
     def run(*args):
         return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True,
@@ -148,6 +178,18 @@ def git_metrics(cwd):
         result["branch"] = branch.stdout.strip() or "detached"
         changed = run("status", "--porcelain")
         result["files"] = len(changed.stdout.splitlines()) if changed.returncode == 0 else None
+        if changed.returncode == 0:
+            statuses = [line[:2] for line in changed.stdout.splitlines() if len(line) >= 2]
+            result["staged"] = sum(s[0] not in (" ", "?") for s in statuses)
+            result["modified"] = sum(s[1] not in (" ", "?") for s in statuses)
+            result["untracked"] = sum(s == "??" for s in statuses)
+        if extra:
+            project = run("rev-parse", "--show-toplevel")
+            if project.returncode == 0:
+                result["project"] = Path(project.stdout.strip()).name
+            stash = run("stash", "list", "--format=%gd")
+            if stash.returncode == 0:
+                result["stash"] = len(stash.stdout.splitlines())
         diff = run("diff", "HEAD", "--numstat")
         if diff.returncode == 0:
             rows = [line.split("\t") for line in diff.stdout.splitlines()]
@@ -186,9 +228,26 @@ def cached_call(client, method, params, key, ttl):
         return saved.get("value", {}), age, str(exc)
 
 class Monitor:
-    def __init__(self, client, cwd, thread_id=None):
+    def __init__(self, client, cwd, thread_id=None, lock_session=False, started_after=None):
         self.client, self.cwd, self.thread_id = client, str(Path(cwd).resolve()), thread_id
+        self.lock_session, self.started_after = lock_session, started_after
+        self.explicit_thread = bool(thread_id)
         self.reader = RolloutReader()
+
+    def select_thread(self):
+        if self.thread_id:
+            return self.client.call("thread/read", {"threadId": self.thread_id, "includeTurns": False})["thread"]
+        params = {"cwd": self.cwd, "limit": 100 if self.started_after is not None else 1,
+                  "sortKey": "created_at" if self.started_after is not None else "updated_at"}
+        threads = self.client.call("thread/list", params).get("data", [])
+        if self.started_after is not None:
+            threads = [t for t in threads if (number(t.get("createdAt")) or 0) >= int(self.started_after)]
+            # Pick the first new session, then remain pinned. Explicit --thread is exact.
+            threads.sort(key=lambda t: number(t.get("createdAt")) or 0)
+        thread = threads[0] if threads else {}
+        if self.lock_session and thread.get("id"):
+            self.thread_id = thread["id"]
+        return thread
 
     def collect(self, config):
         from .native import configured_fields
@@ -198,12 +257,8 @@ class Monitor:
         if config.get("native_mode") == "auto":
             snapshot["native_fields"] = configured_fields(self.client, self.cwd)
         try:
-            if self.thread_id:
-                thread = self.client.call("thread/read", {"threadId": self.thread_id, "includeTurns": False})["thread"]
-            else:
-                threads = self.client.call("thread/list", {"cwd": self.cwd, "limit": 1, "sortKey": "updated_at"}).get("data", [])
-                thread = threads[0] if threads else {}
-            snapshot["selection"] = "pinned" if self.thread_id else "latest in directory"
+            thread = self.select_thread()
+            snapshot["selection"] = "pinned" if self.explicit_thread else "locked" if self.thread_id else "waiting for new session" if self.started_after is not None else "latest in directory"
             snapshot["thread"] = {k: thread.get(k) for k in ("id", "model", "reasoningEffort", "status", "createdAt", "updatedAt", "cliVersion", "agentNickname")}
             telemetry = self.reader.read(thread.get("path"))
             snapshot.update(token_metrics(telemetry.get("tokens", {})))
@@ -213,7 +268,8 @@ class Monitor:
             if not snapshot["windows"] and telemetry.get("rate_limits"):
                 snapshot.update(normalize_limits({"rate_limits": telemetry["rate_limits"]}))
                 snapshot["quota_source"] = "last recorded turn"
-            snapshot["git"] = git_metrics(thread.get("cwd") or self.cwd)
+            enabled = set(config["widgets"] + config["line2_widgets"])
+            snapshot["git"] = git_metrics(thread.get("cwd") or self.cwd, bool(enabled & {"stash", "project"}))
             if set(config["widgets"] + config["line2_widgets"]) & {"streak", "lifetime", "heatmap"}:
                 usage, _, usage_error = cached_call(self.client, "account/usage/read", {}, "account-usage", 300)
                 snapshot["account_usage"] = usage

@@ -40,7 +40,17 @@ Session ━━━━──────── 39% 3h 31m | Weekly ━━━━━
 Context ━━────────── 14% | codex-model | Effort high | main
 ```
 
-**Two displays, one project.** The **native footer** lives inside Codex CLI and uses its supported built-in status items. The **Pulse companion** runs in a terminal pane below Codex and supplies the full themes, bars, animations, timers, and extra widgets. Codex's documented `tui.status_line` accepts item identifiers, not a script command. Pulse does not patch the Codex executable or inject a footer into the desktop app. [Official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
+**What you will see after installing:** running `codex` shows Codex's built-in footer. It may still look like `Weekly 59% left | Context 0% used | gpt-6-astra high | Fast off` (example values). **Restarting Codex does not start the themed Pulse display.** To see that display, launch the companion using the instructions below.
+
+| Display | Where it appears | How to start it |
+|---|---|---|
+| Native Codex footer | Inside Codex, with built-in labels and quota remaining | Restart `codex` after installation |
+| Full Pulse companion | In its own terminal pane, with themes, bars, timers, and quota used | Use `--launch`, or `--watch` in a dedicated pane |
+| Preview | Printed in the terminal or tool output that ran it | Use `--preview`; values are synthetic and it exits after printing |
+
+The illustrations and previews above use sample data, not your account's usage. Installing the skill enables conversational configuration; it does not keep a monitor running.
+
+Codex's documented `tui.status_line` accepts built-in item identifiers, not a script command. Pulse does not patch the Codex executable or inject a footer into the desktop app. [Official configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference)
 
 Native Codex labels quota **remaining**; the companion labels quota **used**, matching Claude Pulse. For example, `75% left` and `Weekly 25%` describe the same usage.
 
@@ -56,11 +66,47 @@ Install [Codex CLI](https://learn.chatgpt.com/docs/codex-cli), Python 3.11+, and
 irm https://raw.githubusercontent.com/NoobyGains/CodexPulse/main/install.ps1 | iex
 ```
 
-Restart Codex for the native footer. To open Codex with a live Pulse pane underneath, run this from your coding project:
+Installation configures the native footer and installs the helper skill. **There is a separate step to start the live Pulse companion.** Run these commands at a PowerShell prompt (`PS ...>`), not inside Codex's chat input.
+
+#### Open Codex with Pulse
+
+From your coding project folder, run:
 
 ```powershell
-python "$HOME/.codexpulse/project/codex_status.py" --launch
+python "$HOME/.codexpulse/project/codex_status.py" --launch --native-mode off
 ```
+
+This requires Windows Terminal (`wt.exe`). It opens a new tab with Codex above and the live Pulse companion below; depending on your Terminal settings, the tab may open in a new window. It starts a new Codex session. To resume an existing session in that layout, add `--thread YOUR_THREAD_ID`.
+
+Use this command whenever you want to start both displays. Running plain `codex` later starts only Codex. The `--native-mode off` preference is saved and makes Pulse show its full set of enabled fields, including those also present in the native footer.
+
+#### Use your existing PowerShell window
+
+PowerShell is the shell; the terminal hosting it determines whether you can add panes.
+
+**PowerShell inside Windows Terminal:** activate the tab and PowerShell pane you want to use, then run this from your project folder:
+
+```powershell
+wt.exe -w 0 split-pane -H --size 0.2 -d "$PWD" python "$HOME/.codexpulse/project/codex_status.py" --watch --cwd "$PWD" --native-mode off
+```
+
+This adds only a Pulse pane below the active pane in the most recently used Windows Terminal window. Click the upper pane to keep using PowerShell and run `codex` there. It does not start another Codex session. If Codex already occupies that pane, use Windows Terminal's split-pane action to create a second PowerShell pane, then run the `--watch` command below in it with the same project directory. [Windows Terminal pane commands](https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments#split-pane-command)
+
+**Standalone PowerShell console:** Pulse can run in your current window with:
+
+```powershell
+python "$HOME/.codexpulse/project/codex_status.py" --watch --cwd "$PWD" --native-mode off
+```
+
+The live monitor occupies that console until you press Ctrl+C. This installation cannot put Pulse and an interactive Codex session together in a single unsplit console. To use both simultaneously, keep Codex in your original window and run the monitor in another PowerShell window, or use the Windows Terminal pane layout above.
+
+For a single usage snapshot that returns immediately to your existing PowerShell prompt:
+
+```powershell
+python "$HOME/.codexpulse/project/codex_status.py" --cwd "$PWD"
+```
+
+The companion follows the latest stored Codex session in the directory supplied with `--cwd`. Use the same project folder as Codex, or add `--thread YOUR_THREAD_ID` to pin a session. Missing data is unknown; the live display may contain fewer fields than the preview.
 
 ### macOS / Linux
 
@@ -101,12 +147,22 @@ Pip installs the companion command. `--launch` and `--install-skill` require the
 
 </details>
 
+## Windows rendering and optional extras
+
+Pulse now enables Windows terminal escape processing explicitly and falls back to native console drawing when needed. Identical frames are skipped; `--redraw changes` keeps the display quiet, while `--redraw live` enables saved animations. `--ascii` provides portable bars and labels. A bare `--cwd` uses the current folder.
+
+Use `--launch --cwd .` for Codex above Pulse in the same Windows Terminal window. Add `--thread YOUR_SESSION_ID` to resume and monitor an exact conversation. Use `--attach` from inside Windows Terminal to add only the Pulse pane to that window.
+
+The existing simple display remains available with `--preset minimal --no-header --native-mode off`. The new `tasks`, `active_tools`, `git_status`, `stash`, and `project` widgets are opt-in through `--show`, or included in `--preset full`. Preview them first with `--preview --show tasks,active_tools,git_status,stash,project`.
+
+See [Windows usage and rendering details](docs/WINDOWS.md) and [reference projects and license notices](docs/THIRD_PARTY_NOTICES.md).
+
 ## Why CodexPulse
 
 - **Codex-native data.** Quotas come through `codex app-server` using your existing login. Pulse never reads or refreshes your authentication tokens itself. [Official app-server API](https://learn.chatgpt.com/docs/app-server)
 - **Real window durations.** Five-hour, weekly, and other windows are classified from their reported duration. A weekly primary window stays weekly.
 - **Model-specific limits.** Additional buckets use the labels Codex provides; no hardcoded Claude models or imaginary per-model caps.
-- **Fifteen themes, five animation modes, eight bar styles.** Familiar Pulse customization in the companion.
+- **Fifteen themes, five animation modes, nine bar styles.** Familiar Pulse customization in the companion.
 - **Honest context and costs.** Context uses the latest request's tokens, never cumulative session tokens. Missing measurements stay unknown. Cost appears only when Codex provides an estimate.
 - **Quiet refreshes.** Local display refresh and animation are separate from network polling; quota reads are cached for 60 seconds by default, with failure backoff.
 - **Reversible setup.** Codex writes its own configuration. Pulse keeps a backup and refuses to overwrite later user edits during uninstall.
@@ -116,7 +172,7 @@ Pip installs the companion command. `--launch` and `--install-skill` require the
 | Feature | What CodexPulse provides |
 |---|---|
 | Session and weekly usage | Actual used percentages, local reset time, countdown, and expired-data markers |
-| Additional model budgets | Every model/limit bucket the account reports, with its actual window duration |
+| Additional model budgets | Reported model/limit buckets with their actual window duration; Spark is opt-in |
 | Context pressure | Last reported context percentage, token count, and a warning at 90% |
 | Model and reasoning | Current thread model and effort, plus observed fast/priority service tier when recorded |
 | Token detail | Cumulative input, output, reasoning, total tokens, and cached-input share |
@@ -128,7 +184,7 @@ Pip installs the companion command. `--launch` and `--install-skill` require the
 | Focus timer | Start, pause, resume, stop, and completion indicator |
 | Trends | Local quota sparkline, observed burn rate, approximate runway, and usage-versus-time pace |
 | Account stats | Official lifetime tokens, activity streak, and daily token heatmap when available |
-| Layout | Four layouts, widget priorities, optional second row, Unicode-aware width fitting and wrapping |
+| Layout | Live width/height adaptation, word wrapping, compact fallback, widget priorities, and an optional second row |
 | Configuration | Preview, fifteen-theme picker, presets, twenty-step undo, and `$codexpulse` helper |
 | Maintenance | Doctor, explicit release checks, clean-tree fast-forward updates, and reversible native install |
 
@@ -156,6 +212,31 @@ Activity and context are **last recorded telemetry**, not a direct subscription 
 
 </details>
 
+## Model quotas and Spark
+
+Spark quota windows are **hidden by default**, including for existing configurations that have no Spark preference. Pulse keeps the main account limits and other reported model buckets visible, including an Astra bucket when Codex supplies one. The model widget shows the selected session's model. Shared account quotas keep their reported identity; Pulse does not invent a separate Astra percentage when none is reported.
+
+Enable or hide Spark explicitly:
+
+```powershell
+python "$HOME/.codexpulse/project/codex_status.py" --spark
+python "$HOME/.codexpulse/project/codex_status.py" --no-spark
+```
+
+These commands save the preference. Spark windows also need the `limits` widget enabled (it is enabled by default); add `--show limits` if you previously hid it. The setting filters the display, while `--json` retains the reported quota data for diagnostics. It does not affect the unrelated `sparkline` trend widget. A running companion reloads display preferences on its next metadata refresh.
+
+## Resizing the live display
+
+With the default `--wrap auto`, `--watch` checks the terminal's width and height on every display frame. It wraps complete widgets onto new rows and wraps long labels by words rather than cutting off their percentages.
+
+When the pane is too short for all rows, Pulse tries shorter bars, a minimal layout, merging the configured second row, and hiding reset times. It restores the configured detail when the pane grows. These temporary layout adjustments do not change saved preferences. If the content still cannot fit, an overflow marker indicates that more rows are hidden. The header only appears when there is room.
+
+```powershell
+python "$HOME/.codexpulse/project/codex_status.py" --wrap auto
+```
+
+Use `--wrap off` to keep clipping instead of automatic reflow. An explicit `--width` caps the display width. After upgrading renderer code, stop and restart the companion to load it; later window resizes do not require a restart. These behaviors apply to the Pulse companion, while Codex controls its own native footer.
+
 ## Themes
 
 <p align="center">
@@ -176,7 +257,7 @@ The picker accepts a theme name or number, previews all themes, and saves only t
 ### Animation and bar styles
 
 ```sh
-python codex_status.py --animate rainbow --animation-speed normal
+python codex_status.py --redraw live --animate rainbow --animation-speed normal
 python codex_status.py --bar-style braille --bar-size medium
 ```
 
@@ -188,7 +269,7 @@ python codex_status.py --bar-style braille --bar-size medium
 | `glow` | Brightness wave across the filled bar |
 | `shift` | Moving highlight |
 
-Styles: `classic`, `block`, `shade`, `pipe`, `dot`, `square`, `star`, `braille`. Sizes: `small`, `small-medium`, `medium`, `medium-large`, `large`. Animations repaint at five frames per second in watch mode without extra quota requests. Minimal layout has colored percentages and no bars to animate. `NO_COLOR` and `--plain` disable ANSI color; `--color-depth` supports truecolor, 256, and 16-color terminals.
+Styles: `classic`, `block`, `shade`, `pipe`, `dot`, `square`, `star`, `braille`, `ascii`. Sizes: `small`, `small-medium`, `medium`, `medium-large`, `large`. With `--redraw live`, animations repaint at five frames per second in watch mode without extra quota requests. Minimal layout has colored percentages and no bars to animate. `NO_COLOR` and `--plain` disable ANSI color; `--color-depth` supports truecolor, 256, and 16-color terminals.
 
 ## Configure it by talking to it
 
@@ -253,7 +334,7 @@ session weekly limits context model effort branch
 tokens input output reasoning cache context_tokens plan credits reset_credits
 fast activity heartbeat last_tool elapsed focus cost budget files lines
 git_drift worktree agents streak lifetime sparkline burn_rate runway pace
-version compactions
+version compactions tasks active_tools git_status stash project
 ```
 
 Configuration lives in `~/.codexpulse/config.json`. The default quota cache is 60 seconds (minimum 30); metadata refresh is 10 seconds (minimum 2). Account activity and cost reads cache for five minutes. Reset times use your machine's local timezone. Historical quota percentages are reset-window scoped. Runway is a linear estimate based on locally observed usage, not a promise of available time. `--no-header` hides the watch banner; small panes suppress it automatically to leave room for usage.
@@ -272,8 +353,12 @@ python codex_status.py --uninstall
 - **No quotas:** run `codex login`, then check `codex` → `/status`. API-key-only or unsupported auth routes may have no ChatGPT quota windows.
 - **No context:** send a turn in the selected project, or pin `--thread`. Context needs a recorded token event.
 - **Wrong session:** use `--cwd` or `--thread`; the companion does not assume that every terminal belongs to the same thread.
-- **No colors:** use a terminal with ANSI support, remove `NO_COLOR`, or set `--color-depth truecolor`.
-- **Footer unchanged:** restart Codex CLI. The desktop application's UI is separate.
+- **Raw color/cursor codes or scrolling spam:** restart Pulse after updating. It now enables Windows VT processing automatically and uses a native console fallback if unavailable. Use `--redraw changes` for quiet output, `--ascii` for portable characters, and `--doctor` to inspect the selected renderer.
+- **No colors:** the native console fallback is intentionally plain. In an ANSI-capable terminal, remove `NO_COLOR` or use the appropriate `--color-depth`.
+- **Only seeing `Weekly ... left`, `Context ... used`, the model, or `Fast off`:** this is the native Codex footer. Installation may leave its appearance unchanged if it already matches the preset. Start `--launch` for Codex plus Pulse, or `--watch` in a dedicated pane; restarting alone does not launch the companion.
+- **Preview appeared once and disappeared:** `--preview` prints synthetic data and exits. Use `--watch` for a live display; preview percentages are not your account values.
+- **Want Pulse in the current PowerShell window:** follow the existing-window instructions above. Windows Terminal supports a companion pane; a standalone console can run the monitor by itself.
+- **Pulse omits percentages or model details:** `--native-mode auto` avoids repeating configured native footer fields. Set `--native-mode off` for the complete companion display.
 - **Uninstall refuses:** your Codex config changed after installation. Compare `~/.codexpulse/native-backup.json` or use `/statusline`; your newer edits are preserved. `--uninstall` restores the footer/config backup, not the source checkout or optional helper skill.
 
 Updates require a clean checkout on `main` with the official CodexPulse origin and use `git pull --ff-only`. They never pull Claude Pulse into CodexPulse. The original source is retained as the read-only `upstream` remote in development.

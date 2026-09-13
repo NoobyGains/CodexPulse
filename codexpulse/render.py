@@ -15,13 +15,14 @@ from .storage import home, read_json
 THEMES = json.loads(Path(__file__).with_name("themes.json").read_text(encoding="utf-8"))
 STYLES = {"classic": ("━", "─"), "block": ("█", "░"), "shade": ("▓", "░"),
     "pipe": ("┃", "┊"), "dot": ("●", "○"), "square": ("■", "□"),
-    "star": ("★", "☆"), "braille": ("⣿", "⣀")}
+    "star": ("★", "☆"), "braille": ("⣿", "⣀"), "ascii": ("#", "-")}
 ANIMATIONS = ("off", "rainbow", "pulse", "glow", "shift")
 WIDGETS = ("session", "weekly", "limits", "context", "model", "effort", "branch",
     "tokens", "input", "output", "reasoning", "cache", "context_tokens", "plan", "credits",
     "reset_credits", "fast", "activity", "heartbeat", "last_tool", "elapsed", "focus",
     "cost", "budget", "files", "lines", "git_drift", "worktree", "agents", "streak",
-    "lifetime", "sparkline", "burn_rate", "runway", "pace", "version", "compactions")
+    "lifetime", "sparkline", "burn_rate", "runway", "pace", "version", "compactions",
+    "tasks", "active_tools", "git_status", "stash", "project")
 ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
 RESET = "\x1b[0m"
 
@@ -49,6 +50,47 @@ def clip(text, width):
         used += size
         pos += 1
     return "".join(out) + (RESET if "\x1b" in text else "")
+
+def wrap_text(text, width):
+    """Wrap on words, splitting overlong tokens by terminal cells, including ANSI."""
+    width = max(1, width)
+    rows, current = [], ""
+    for word in text.split(" "):
+        candidate = current + (" " if current else "") + word
+        if cell_width(candidate) <= width:
+            current = candidate
+            continue
+        if current:
+            rows.append(current)
+            current = ""
+        # Long identifiers and CJK text have no convenient space to wrap on.
+        pos, used = 0, 0
+        while pos < len(word):
+            match = ESCAPE.match(word, pos)
+            if match:
+                current += match.group()
+                pos = match.end()
+                continue
+            char = word[pos]
+            size = cell_width(char)
+            if used + size > width and used:
+                rows.append(current)
+                current, used = "", 0
+            if size > width:
+                char, size = "?", 1
+            current += char
+            used += size
+            pos += 1
+    if current:
+        rows.append(current)
+    return rows
+
+
+def is_spark_window(window):
+    """Match the reported model identity, without hiding unrelated trend widgets."""
+    identity = str(window.get("id", "")) + " " + str(window.get("label", ""))
+    return bool(re.search(r"(?:^|[^a-z0-9])spark(?:$|[^a-z0-9])", identity, re.I))
+
 
 def paint(text, hex_color, depth="truecolor", fallback=None):
     if depth == "none":
@@ -79,7 +121,7 @@ def bar(pct, cfg, plain=False, frame=0):
     depth = color_depth(cfg, plain)
     size = cfg["bar_size"]
     filled = round(pct / 100 * size)
-    full, empty = STYLES[cfg["bar_style"]]
+    full, empty = STYLES["ascii" if cfg.get("ascii") else cfg["bar_style"]]
     fallback = theme["c" + depth][tier] if depth in ("16", "256") else None
     animation = cfg["animate"]
     if cfg["theme"] == "rainbow" and animation == "off":
@@ -89,7 +131,7 @@ def bar(pct, cfg, plain=False, frame=0):
     for i in range(size):
         active = i < filled
         char = full if active else empty
-        if cfg["bar_style"] == "braille":
+        if cfg["bar_style"] == "braille" and not cfg.get("ascii"):
             steps = "⣀⣄⣤⣦⣶⣷⣿"
             level = max(0, min(6, round((pct / 100 * size - i) * 6)))
             char, active = steps[level], level > 0
@@ -152,14 +194,16 @@ def widgets(snapshot, cfg, plain=False, frame=0):
     values = {}
     native = set(snapshot.get("native_fields", [])) if cfg.get("native_mode") == "auto" else set()
     now = snapshot.get("at", time.time())
-    windows = snapshot.get("windows", [])
+    windows = [w for w in snapshot.get("windows", [])
+        if cfg.get("spark", False) or not is_spark_window(w)]
     for kind in ("session", "weekly", "limits"):
         selected = [w for w in windows if (w["id"] != "codex" or w["kind"] == "other") == (kind == "limits")
             and (kind == "limits" or w["kind"] == kind)]
         if selected:
             fields = {"session": "five-hour-limit", "weekly": "weekly-limit"}
             values[kind] = [usage_widget(w["label"], w["used"], cfg, plain, frame,
-                fields.get(kind) in native) + reset_time(w, cfg, now) for w in selected]
+                fields.get(kind) in native) + ("" if cfg.get("_short_resets") else reset_time(w, cfg, now))
+                for w in selected]
     context = snapshot.get("context")
     values["context"] = usage_widget("Context", context, cfg, plain, frame,
         bool(native & {"context-used", "context-remaining"})) + (" !" if context >= 90 else "") if context is not None else "Context ?"
@@ -196,6 +240,22 @@ def widgets(snapshot, cfg, plain=False, frame=0):
         values["git_drift"] = f"Git ↑{git['ahead']} ↓{git['behind']}"
     if git.get("worktree"):
         values["worktree"] = "Worktree"
+    if git.get("staged") is not None:
+        values["git_status"] = f"Git staged {git['staged']} modified {git['modified']} untracked {git['untracked']}"
+    if git.get("stash") is not None:
+        values["stash"] = f"Stash {git['stash']}"
+    if git.get("project"):
+        values["project"] = clean(git["project"])
+    tasks = snapshot.get("tasks")
+    if isinstance(tasks, dict):
+        values["tasks"] = f"Tasks {tasks['completed']}/{tasks['total']}"
+    if isinstance(snapshot.get("active_tools"), list):
+        names = list(dict.fromkeys(clean(n) for n in snapshot["active_tools"]))
+        values["active_tools"] = "Tools " + (", ".join(names[:3]) if names else "idle")
+        if len(names) > 3:
+            values["active_tools"] += f" +{len(names) - 3}"
+        if snapshot.get("partial"):
+            values["active_tools"] += " (observed)"
     if "agents" in snapshot:
         agents = snapshot["agents"]
         active = sum(a["status"] == "active" for a in agents)
@@ -222,7 +282,7 @@ def widgets(snapshot, cfg, plain=False, frame=0):
         values["focus"] = "Focus " + (countdown(focus["end"] - now) if focus["end"] > now else "done!")
     rows = snapshot.get("samples", [])
     if rows:
-        chars = "▁▂▃▄▅▆▇█"
+        chars = "._-:=+*#" if cfg.get("ascii") else "▁▂▃▄▅▆▇█"
         values["sparkline"] = "".join(chars[min(7, max(0, round(r[1] / 100 * 7)))] for r in rows[-12:])
     if len(rows) >= 2 and rows[-1][0] > rows[0][0] and rows[-1][1] >= rows[0][1]:
         rate = (rows[-1][1] - rows[0][1]) / ((rows[-1][0] - rows[0][0]) / 60)
@@ -248,14 +308,41 @@ def widgets(snapshot, cfg, plain=False, frame=0):
 def watch_rows(snapshot, cfg, width, height, thread=None, plain=False, frame=0):
     """Keep actual usage visible even when a companion pane is only two rows tall."""
     capacity = max(1, height - 1)
+    width = max(1, width)
     rows = render(snapshot, cfg, width, plain, frame).splitlines()
+    if cfg["wrap"] == "auto" and len(rows) > capacity:
+        # Recompute on every frame; resizing never changes saved preferences.
+        compact = cfg | {"bar_size": min(4, cfg["bar_size"])}
+        combined = list(dict.fromkeys(cfg["widgets"] + cfg["line2_widgets"]))
+        for candidate in (
+            compact,
+            compact | {"layout": "minimal"},
+            compact | {"layout": "minimal", "widgets": combined, "line2_widgets": []},
+            compact | {"layout": "minimal", "widgets": combined, "line2_widgets": [], "_short_resets": True},
+        ):
+            fitted = render(snapshot, candidate, width, plain, frame).splitlines()
+            if len(fitted) < len(rows):
+                rows = fitted
+            if len(rows) <= capacity:
+                break
+    if len(rows) > capacity:
+        hidden = len(rows) - capacity
+        rows = rows[:capacity]
+        marker = f" … +{hidden} rows"
+        rows[-1] = (clip(rows[-1], width - cell_width(marker)) + marker
+                    if cell_width(marker) < width else clip("…", width))
     if cfg.get("header", True) and capacity >= len(rows) + 2:
         header = "CodexPulse · " + ("thread " + clean(thread[:8]) if thread else "latest session in directory") + " · Ctrl+C to exit"
         rows = [clip(header, width), "", *rows]
-    return rows[:capacity]
+    return [ascii_text(row) for row in rows[:capacity]] if cfg.get("ascii") else rows[:capacity]
+
+
+def ascii_text(text):
+    return text.translate(str.maketrans({"↑": "^", "↓": "v", "…": "~", "·": "|"})).encode("ascii", "replace").decode("ascii")
+
 
 def render(snapshot, cfg, width=120, plain=False, frame=0):
-    width = max(10, width)
+    width = max(1, width)
     values = widgets(snapshot, cfg, plain, frame)
     lines = []
     def row(names):
@@ -267,9 +354,12 @@ def render(snapshot, cfg, width=120, plain=False, frame=0):
         current = ""
         for part in parts:
             candidate = current + (" | " if current else "") + part
-            if cell_width(candidate) > width and cfg["wrap"] == "auto" and current:
-                lines.append(current)
-                current = clip(part, width)
+            if cfg["wrap"] == "auto" and cell_width(candidate) > width:
+                if current:
+                    lines.append(current)
+                wrapped = wrap_text(part, width)
+                lines.extend(wrapped[:-1])
+                current = wrapped[-1] if wrapped else ""
             else:
                 current = clip(candidate, width) if cell_width(candidate) > width else candidate
         if current:
@@ -279,6 +369,8 @@ def render(snapshot, cfg, width=120, plain=False, frame=0):
     notices = []
     if not snapshot.get("windows"):
         notices.append("Quota unavailable (requires a supported Codex login)")
+    elif not cfg.get("spark", False) and all(is_spark_window(w) for w in snapshot["windows"]):
+        notices.append("No non-Spark quota reported; --spark shows Spark")
     if not snapshot.get("thread", {}).get("id"):
         notices.append("No Codex session in this directory")
     if snapshot.get("age", 0) > max(120, cfg["cache_ttl"] * 2):
@@ -288,8 +380,10 @@ def render(snapshot, cfg, width=120, plain=False, frame=0):
     if snapshot.get("errors"):
         notices.append(clean(snapshot["errors"][0]))
     if notices:
-        lines.append(clip(" · ".join(notices), width))
-    return "\n".join(lines)
+        notice = " · ".join(notices)
+        lines.extend(wrap_text(notice, width) if cfg["wrap"] == "auto" else [clip(notice, width)])
+    result = "\n".join(lines)
+    return ascii_text(result) if cfg.get("ascii") else result
 
 def demo():
     now = time.time()
@@ -299,6 +393,7 @@ def demo():
         {"id": "example-model", "slot": "secondary", "kind": "weekly", "label": "Model quota", "used": 89, "reset": None, "minutes": 10080}],
         "context": 14, "model": "codex-model", "effort": "high", "plan": "pro",
         "total_tokens": 182400, "input_tokens": 170000, "output_tokens": 12400, "reasoning_tokens": 3200,
-        "cache": 82, "git": {"branch": "main", "files": 4, "added": 42, "removed": 7},
+        "cache": 82, "git": {"branch": "main", "files": 4, "added": 42, "removed": 7, "staged": 1, "modified": 2, "untracked": 1, "stash": 2, "project": "codexpulse"},
         "thread": {"id": "demo", "createdAt": now-2700, "cliVersion": "0.154.0"}, "age": 0,
-        "cost_usd": 1.24, "tools": 47, "activity": "working", "last_tool": "exec_command"}
+        "cost_usd": 1.24, "tools": 47, "activity": "working", "last_tool": "exec_command",
+        "tasks": {"total": 5, "completed": 2, "in_progress": 1}, "active_tools": ["exec_command"]}
